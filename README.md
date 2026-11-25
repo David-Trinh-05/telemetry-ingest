@@ -5,6 +5,27 @@ JSON (NDJSON). The Rust service uses Axum and Tokio. Clients get an explicit
 response when the server is overloaded, and an operator can see whether the
 output is making progress.
 
+## Demo
+
+When the writer is blocked, the API returns HTTP `503` as soon as the queue
+fills. On `SIGTERM`, the demo resumes reading stdout and verifies that all
+**2,112 admitted records** are written in order before the server exits.
+A second run checks readiness after the stdout pipe is closed.
+
+```text
+Queue full: HTTP 503. SIGTERM drained 2112 records in order.
+Broken stdout: /ready returned HTTP 503, with 64 unconfirmed records.
+```
+
+Reproduce both results on Linux with Python 3.10 or later.
+
+```sh
+cargo build --locked
+python3 scripts/check_pipeline.py
+```
+
+## Architecture
+
 ```mermaid
 flowchart LR
     Device["Sensor or gateway"] -->|JSON batch| HTTP["Axum validation"]
@@ -94,11 +115,6 @@ queue. Error bodies contain a stable `code` and a short `message`.
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
-cargo build --locked
-python3 scripts/check_pipeline.py
 ```
 
-The Python 3.10+ check runs on Linux. It holds a small stdout pipe unread,
-fills the queue using real HTTP requests, verifies the `503`, then sends
-SIGTERM and checks every admitted record against the drained output. A second
-run closes the pipe and checks readiness and the exit code.
+The [demo](#demo) exercises the service over a real HTTP socket.
